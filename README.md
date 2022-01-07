@@ -2,20 +2,25 @@
 S3 platform code for results to Industry 4.0
 
 
-wget https://figshare.com/ndownloader/files/27546551/S3Dataset.zip
+The dataset is availabe in https://figshare.com/articles/dataset/S3Dataset_zip/14410229/2
 
 
 ## Requirements
 The Python packages required to run the code are: Progressbar2, Pandas, Scikit-learn, and PyOD (https://pyod.readthedocs.io/en/latest/install.html). A requirements.txt file is attached to be able to create the environment in conda directly with the following command:
-`$ conda create --name S3platform --file requirements.txt'
+
+`$ conda create --name S3platform --file requirements.txt `
 
 
 ## Initial Steps
 
 To get the Dataset, execute the follow comands:
+
 `$ wget https://figshare.com/ndownloader/files/27546551/S3Dataset.zip`
+
 `$ unzip S3Dataset.zip`
+
 Activate your enviroment 
+
 `$ python code/restructureDataFolderByUser.py`
 
 ## Run Experiment 1
