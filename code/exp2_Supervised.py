@@ -97,199 +97,212 @@ file_resume = pathToScores + '/resume_'+datatype+'.txt'
 a_file=open(file_resume, "a")
 
 from itertools import combinations
-userCombinations = list(combinations(range(0,len(users)), 4))
 
-import random
-randomSample = random.sample(range(0, len(userCombinations)-1), 20)
+for icom in range(1,15):
+	print("number of unknown users: " + str(icom))
+	a_file.write("number of unknown users: " + str(icom))
+	userCombinations = list(combinations(range(0,len(users)), icom))
 
-eer_know=[]
-auc_know=[]
-f1_know=[]
+	import random
+	num_test=min(20,len(userCombinations))
+	randomSample = random.sample(range(0, len(userCombinations)),num_test)
 
-eer_unknow=[]
-auc_unknow=[]
-f1_unknow=[]
-for iter in progressbar(range(0,20)):
-	
-	user_unknown = userCombinations[randomSample[iter]]
-	a_file.write("user unknow"+str(user_unknown[0]) +','+str(user_unknown[1]) + ',' + str(user_unknown[2])+ ',' + str(user_unknown[3]) +"\n")
-	
-	scores_global=np.empty([0,2])
-	labels_global=np.empty([0])
-	scores_global_unknow=np.empty([0,2])
-	labels_global_unknow=np.empty([0])
+	eer_know=[]
+	auc_know=[]
+	f1_know=[]
 
-	for iuser in range(0,len(users)):	
+	eer_unknow=[]
+	auc_unknow=[]
+	f1_unknow=[]
+	for iter in progressbar(range(0,num_test)):
 		
-		userfile = users[iuser]
-		if args.verbose:
-			print(" USER {}-{}: {}".format(iuser, len(users),userfile))
+		user_unknown = userCombinations[randomSample[iter]]
+		# a_file.write("user unknow"+str(user_unknown[0]) +','+str(user_unknown[1]) + ',' + str(user_unknown[2])+ ',' + str(user_unknown[3]) +"\n")
 		
-		nombreUsuario=userfile.split('/')[-1].split('_')[0]
-		numUsuario = int(nombreUsuario.replace('user',''))
-		
-		if iuser in user_unknown: 
+		scores_global=np.empty([0,2])
+		labels_global=np.empty([0])
+		scores_global_unknow=np.empty([0,2])
+		labels_global_unknow=np.empty([0])
+
+		for iuser in range(0,len(users)):	
+			
+			userfile = users[iuser]
 			if args.verbose:
-				print("skiping user")
-		else:
-		
-			dataFrameUserTrain=pd.read_csv(userfile,header=None,prefix='X')
+				print(" USER {}-{}: {}".format(iuser, len(users),userfile))
 			
-			if not datatype=='voice':
-				X_train_target = dataFrameUserTrain.values[:,1:]
+			nombreUsuario=userfile.split('/')[-1].split('_')[0]
+			numUsuario = int(nombreUsuario.replace('user',''))
+			
+			if iuser in user_unknown: 
+				if args.verbose:
+					print("skiping user")
 			else:
-				X_train_target = dataFrameUserTrain.values[:,2:]
 			
-			labels_target=np.zeros(X_train_target.shape[0])
+				dataFrameUserTrain=pd.read_csv(userfile,header=None,prefix='X')
+				
+				if not datatype=='voice':
+					X_train_target = dataFrameUserTrain.values[:,1:]
+				else:
+					X_train_target = dataFrameUserTrain.values[:,2:]
+				
+				labels_target=np.zeros(X_train_target.shape[0])
 
-			X_train_nontarget=np.empty([0,X_train_target.shape[1]])
-			labels_nontarget=np.empty([0])
+				X_train_nontarget=np.empty([0,X_train_target.shape[1]])
+				labels_nontarget=np.empty([0])
 
 
-			for juser in range(0, len(users)): ## ,10):#
-				if not iuser == juser:
-					userfile_non = users[juser]
-					nombreUsuario=userfile_non.split('/')[-1].split('_')[0]
+				for juser in range(0, len(users)): ## ,10):#
+					if not iuser == juser:
+						userfile_non = users[juser]
+						nombreUsuario=userfile_non.split('/')[-1].split('_')[0]
+						numUsuario = int(nombreUsuario.replace('user',''))
+						
+						if not juser in user_unknown:
+							# contUser+=1
+							userfile_non = users[juser]
+							dataFrameUserTrain_non=pd.read_csv(userfile_non,header=None,prefix='X')
+
+							if not datatype=='voice':
+								X_train_nontarget = np.concatenate((X_train_nontarget,dataFrameUserTrain_non.values[:,1:]))
+							else:
+								X_train_nontarget = np.concatenate((X_train_nontarget, dataFrameUserTrain_non.values[:,2:]))
+
+
+							labels_nontarget=np.concatenate((labels_nontarget,np.ones(dataFrameUserTrain_non.shape[0])))
+				
+				X_train=np.concatenate((X_train_target,X_train_nontarget))
+				labels=np.concatenate((labels_target,labels_nontarget))
+
+				
+				
+				scaler_sensor=scaler()
+				scaler_sensor.fit(X_train)
+				X_train = scaler_sensor.transform(X_train)
+				
+				## Train Model
+				clf = model(**dict_params)
+				clf.fit(X_train,labels)
+						
+				#Test
+				userNameTrain=userfile.split('/')[-1].split('_')[0]
+				scores_model=np.empty([0,2])
+				labels_model=np.empty([0])
+				
+				scores_unknow=np.empty([0,2])
+				labels_unknow=np.empty([0])
+				
+				for kuser in range(0,len(users)): 
+					if iuser==kuser:
+						label='target'
+						label_num=1
+					else:
+						label='nontarget'
+						label_num=0
+						
+					filetest = users[kuser].replace('train','test')
+					nombreUsuario=filetest.split('/')[-1].split('_')[0]
 					numUsuario = int(nombreUsuario.replace('user',''))
 					
-					if not juser in user_unknown:
-						# contUser+=1
-						userfile_non = users[juser]
-						dataFrameUserTrain_non=pd.read_csv(userfile_non,header=None,prefix='X')
-
-						if not datatype=='voice':
-							X_train_nontarget = np.concatenate((X_train_nontarget,dataFrameUserTrain_non.values[:,1:]))
-						else:
-							X_train_nontarget = np.concatenate((X_train_nontarget, dataFrameUserTrain_non.values[:,2:]))
-
-
-						labels_nontarget=np.concatenate((labels_nontarget,np.ones(dataFrameUserTrain_non.shape[0])))
-			
-			X_train=np.concatenate((X_train_target,X_train_nontarget))
-			labels=np.concatenate((labels_target,labels_nontarget))
-
-			
-			
-			scaler_sensor=scaler()
-			scaler_sensor.fit(X_train)
-			X_train = scaler_sensor.transform(X_train)
-			
-			## Train Model
-			clf = model(**dict_params)
-			clf.fit(X_train,labels)
 					
-			#Test
-			userNameTrain=userfile.split('/')[-1].split('_')[0]
-			scores_model=np.empty([0,2])
-			labels_model=np.empty([0])
-			
-			scores_unknow=np.empty([0,2])
-			labels_unknow=np.empty([0])
-			
-			for kuser in range(0,len(users)): 
-				if iuser==kuser:
-					label='target'
-					label_num=1
-				else:
-					label='nontarget'
-					label_num=0
 					
-				filetest = users[kuser].replace('train','test')
-				nombreUsuario=filetest.split('/')[-1].split('_')[0]
-				numUsuario = int(nombreUsuario.replace('user',''))
+					
+					dataFrameUserTest=pd.read_csv(filetest,header=None,prefix='X')
 				
 				
+					if not datatype=='voice':
+						X_test = dataFrameUserTest.values[:,1:]
+					else:
+						X_test = dataFrameUserTest.values[:,2:]
 				
-				
-				dataFrameUserTest=pd.read_csv(filetest,header=None,prefix='X')
-			
-			
-				if not datatype=='voice':
-					X_test = dataFrameUserTest.values[:,1:]
-				else:
-					X_test = dataFrameUserTest.values[:,2:]
-			
-				X_test=scaler_sensor.transform(X_test)
-				Z_clf = clf.predict_proba(X_test)
-				
-				Y_test = [label for i in range(Z_clf.shape[0])]
-				
-				if not kuser in user_unknown:
+					X_test=scaler_sensor.transform(X_test)
+					Z_clf = clf.predict_proba(X_test)
+					
+					Y_test = [label for i in range(Z_clf.shape[0])]
+					
+					if not kuser in user_unknown:
 
-					scores_model=np.concatenate((scores_model,Z_clf))
-					labels_model=np.concatenate((labels_model,np.ones(Z_clf.shape[0])*label_num))					
-					
-				else: 
-					scores_unknow = np.concatenate((scores_unknow,Z_clf))
-					labels_unknow = np.concatenate((labels_unknow,np.ones(Z_clf.shape[0])*label_num))
+						scores_model=np.concatenate((scores_model,Z_clf))
+						labels_model=np.concatenate((labels_model,np.ones(Z_clf.shape[0])*label_num))					
+						
+					else: 
+						scores_unknow = np.concatenate((scores_unknow,Z_clf))
+						labels_unknow = np.concatenate((labels_unknow,np.ones(Z_clf.shape[0])*label_num))
+			
+				scores_global=np.concatenate((scores_global,scores_model))
+				labels_global=np.concatenate((labels_global,labels_model))
+				
+				scores_global_unknow=np.concatenate((scores_global_unknow,scores_unknow))
+				labels_global_unknow=np.concatenate((labels_global_unknow,labels_unknow))
+						
+				eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(scores_model, labels_model, norm='MinMax')
+				eer_users.append(eer_sc)
+				auc_users.append(auc_sc)
+				f1max_users.append(f1max)
+				
+				# if args.verbose:
+					# print("Metris for known Users") 
+					# print(eer_sc)
+					# print(auc_sc)
+					# print(f1max)
+				
+				# a_file.write(userfile+','+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
+				
+				eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(np.concatenate((scores_model,scores_unknow)), np.concatenate((labels_model,labels_unknow)), norm='MinMax')
+				eer_users.append(eer_sc)
+				auc_users.append(auc_sc)
+				f1max_users.append(f1max)
+				
+				# if args.verbose:
+					# print("Metris for known Users") 
+					# print(eer_sc)
+					# print(auc_sc)
+					# print(f1max)
+			
+
+				# a_file.write(userfile+','+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
+			
+		eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(scores_global, labels_global, norm='MinMax')
+		if args.verbose:
+			print("Global Metrics for known Users")
+			print("EER: " + str(eer_sc))
+			print("AUC: " + str(auc_sc))
+			print("F1: " + str(f1max))
+
+		a_file.write('global,'+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
+
+		eer_know.append(eer_sc)
+		auc_know.append(auc_sc)
+		f1_know.append(f1max)
 		
-			scores_global=np.concatenate((scores_global,scores_model))
-			labels_global=np.concatenate((labels_global,labels_model))
-			
-			scores_global_unknow=np.concatenate((scores_global_unknow,scores_unknow))
-			labels_global_unknow=np.concatenate((labels_global_unknow,labels_unknow))
-					
-			eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(scores_model, labels_model, norm='MinMax')
-			eer_users.append(eer_sc)
-			auc_users.append(auc_sc)
-			f1max_users.append(f1max)
-			
-			# if args.verbose:
-				# print("Metris for known Users") 
-				# print(eer_sc)
-				# print(auc_sc)
-				# print(f1max)
-			
-			# a_file.write(userfile+','+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
-			
-			eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(np.concatenate((scores_model,scores_unknow)), np.concatenate((labels_model,labels_unknow)), norm='MinMax')
-			eer_users.append(eer_sc)
-			auc_users.append(auc_sc)
-			f1max_users.append(f1max)
-			
-			# if args.verbose:
-				# print("Metris for known Users") 
-				# print(eer_sc)
-				# print(auc_sc)
-				# print(f1max)
-		
+		eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(np.concatenate((scores_global,scores_global_unknow)), np.concatenate((labels_global,labels_global_unknow)), norm='MinMax')
+		if args.verbose:
+			print("Global Metrics for unknown Users")
+			print("EER: " + str(eer_sc))
+			print("AUC: " + str(auc_sc))
+			print("F1: " + str(f1max))
 
-			# a_file.write(userfile+','+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
-		
-	eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(scores_global, labels_global, norm='MinMax')
-	if args.verbose:
-		print("Global Metrics for known Users")
-		print("EER: " + str(eer_sc))
-		print("AUC: " + str(auc_sc))
-		print("F1: " + str(f1max))
+		a_file.write('global_unknow,'+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
 
-	a_file.write('global,'+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
-
-	eer_know.append(eer_sc)
-	auc_know.append(auc_sc)
-	f1_know.append(f1max)
+		eer_unknow.append(eer_sc)
+		auc_unknow.append(auc_sc)
+		f1_unknow.append(f1max)
 	
-	eer_sc , auc_sc, f1max, eer_threshold = calculate_metrics(np.concatenate((scores_global,scores_global_unknow)), np.concatenate((labels_global,labels_global_unknow)), norm='MinMax')
-	if args.verbose:
-		print("Global Metrics for unknown Users")
-		print("EER: " + str(eer_sc))
-		print("AUC: " + str(auc_sc))
-		print("F1: " + str(f1max))
+	print("Confidence interval for know user")
+	print("EER: ( {} , {} )".format(100*(np.mean(eer_know)-1.96*np.std(eer_know)/np.sqrt(num_test)),100*( np.mean(eer_know)+1.96*np.std(eer_know)/np.sqrt(num_test))))
+	print("AUC: ( {} , {} )".format(100*( np.mean(auc_know)-1.96*np.std(auc_know)/np.sqrt(num_test)),100*( np.mean(auc_know)+1.96*np.std(auc_know)/np.sqrt(num_test))))
+	print("F1: ( {} , {} )".format(100*( np.mean(f1_know)-1.96*np.std(f1_know)/np.sqrt(num_test)),100*( np.mean(f1_know)+1.96*np.std(f1_know)/np.sqrt(num_test))))
 
-	a_file.write('global_unknow,'+str(eer_sc) +','+str(auc_sc) + ',' + str(f1max) +"\n")
 
-	eer_unknow.append(eer_sc)
-	auc_unknow.append(auc_sc)
-	f1_unknow.append(f1max)
+	print("Confidence interval for unknow user")
+	print("EER: ( {} , {} )".format(100*( np.mean(eer_unknow)-1.96*np.std(eer_unknow)/np.sqrt(num_test)),100*( np.mean(eer_unknow)+1.96*np.std(eer_unknow)/np.sqrt(num_test))))
+	print("AUC: ( {} , {} )".format(100*( np.mean(auc_unknow)-1.96*np.std(auc_unknow)/np.sqrt(num_test)), 100*(np.mean(auc_unknow)+1.96*np.std(auc_unknow)/np.sqrt(num_test))))
+	print("F1: ( {} , {} )".format(100*( np.mean(f1_unknow)-1.96*np.std(f1_unknow)/np.sqrt(num_test)),100*( np.mean(f1_unknow)+1.96*np.std(f1_unknow)/np.sqrt(num_test))))
+
+	eer_dif = np.array(eer_unknow)-np.array(eer_know)
+	auc_dif = np.array(auc_know)-np.array(auc_unknow)
+	f1_dif = np.array(f1_know)-np.array(f1_unknow)
 	
-print("Confidence interval for know user")
-print("EER: ( {} , {} )".format( np.mean(eer_know)-1.96*np.std(eer_know), np.mean(eer_know)+1.96*np.std(eer_know)))
-# print("AUC: ( {} , {} )".format( np.mean(auc_know)-1.96*np.std(auc_know), np.mean(auc_know)+1.96*np.std(auc_know)))
-# print("F1: ( {} , {} )".format( np.mean(f1_know)-1.96*np.std(f1_know), np.mean(f1_know)+1.96*np.std(f1_know)))
-
-
-print("Confidence interval for unknow user")
-print("EER: ( {} , {} )".format( np.mean(eer_unknow)-1.96*np.std(eer_unknow), np.mean(eer_unknow)+1.96*np.std(eer_unknow)))
-# print("AUC: ( {} , {} )".format( np.mean(auc_unknow)-1.96*np.std(auc_unknow), np.mean(auc_unknow)+1.96*np.std(auc_unknow)))
-# print("F1: ( {} , {} )".format( np.mean(f1_unknow)-1.96*np.std(f1_unknow), np.mean(f1_unknow)+1.96*np.std(f1_unknow)))
-
+	print("Confidence interval for difference")
+	print("EER: ( {} , {} )".format(100*( np.mean(eer_dif)-1.96*np.std(eer_dif)/np.sqrt(num_test)),100*( np.mean(eer_dif)+1.96*np.std(eer_dif)/np.sqrt(num_test))))
+	print("AUC: ( {} , {} )".format(100*( np.mean(auc_dif)-1.96*np.std(auc_dif)/np.sqrt(num_test)),100*( np.mean(auc_dif)+1.96*np.std(auc_dif)/np.sqrt(num_test))))
+	print("F1: ( {} , {} )".format(100*( np.mean(f1_dif)-1.96*np.std(f1_dif)/np.sqrt(num_test)),100*( np.mean(f1_dif)+1.96*np.std(f1_dif)/np.sqrt(num_test))))
