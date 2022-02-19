@@ -98,7 +98,7 @@ a_file=open(file_resume, "a")
 
 from itertools import combinations
 
-for icom in range(1,15):
+for icom in range(1,16):
 	print("number of unknown users: " + str(icom))
 	a_file.write("number of unknown users: " + str(icom))
 	userCombinations = list(combinations(range(0,len(users)), icom))
@@ -114,6 +114,14 @@ for icom in range(1,15):
 	eer_unknow=[]
 	auc_unknow=[]
 	f1_unknow=[]
+	
+	fpr_known=[]
+	fpr_unknown=[]
+	fpr_total=[]
+	
+	far_known=[]
+	# fpr_unknown_=[]
+	# fpr_total_=[]
 	for iter in progressbar(range(0,num_test)):
 		
 		user_unknown = userCombinations[randomSample[iter]]
@@ -286,23 +294,50 @@ for icom in range(1,15):
 		eer_unknow.append(eer_sc)
 		auc_unknow.append(auc_sc)
 		f1_unknow.append(f1max)
+		
+		nontarget_idx = labels_global==0
+		
+		scores_nontarget = scores_global[nontarget_idx]
+		scores_target = scores_global[~nontarget_idx]
+		
+		total_scores = np.concatenate((scores_nontarget, scores_global_unknow))
+		
+		
+		fpr_known.append(np.sum(scores_nontarget[:,0]>0.5)/len(scores_nontarget))
+		fpr_unknown.append(np.sum(scores_global_unknow[:,0]>0.5)/len(scores_global_unknow))
+		fpr_total.append(np.sum(total_scores[:,0]>0.5)/len(total_scores))
+		
+		far_known.append(np.sum(scores_target[:,0]<0.5)/len(scores_target))
+		# print(scores_global_unknow[:,0])
+		
+	print("( {} , {} ) - ( {} , {} ) - ( {} , {} )".format(
+		100*(np.mean(fpr_known)-1.96*np.std(fpr_known)/np.sqrt(num_test)),100*( np.mean(fpr_known)+1.96*np.std(fpr_known)/np.sqrt(num_test)),
+		100*(np.mean(fpr_total)-1.96*np.std(fpr_total)/np.sqrt(num_test)),100*( np.mean(fpr_total)+1.96*np.std(fpr_total)/np.sqrt(num_test)),
+		100*(np.mean(fpr_unknown)-1.96*np.std(fpr_unknown)/np.sqrt(num_test)),100*( np.mean(fpr_unknown)+1.96*np.std(fpr_unknown)/np.sqrt(num_test))))
 	
-	print("Confidence interval for know user")
-	print("EER: ( {} , {} )".format(100*(np.mean(eer_know)-1.96*np.std(eer_know)/np.sqrt(num_test)),100*( np.mean(eer_know)+1.96*np.std(eer_know)/np.sqrt(num_test))))
-	print("AUC: ( {} , {} )".format(100*( np.mean(auc_know)-1.96*np.std(auc_know)/np.sqrt(num_test)),100*( np.mean(auc_know)+1.96*np.std(auc_know)/np.sqrt(num_test))))
-	print("F1: ( {} , {} )".format(100*( np.mean(f1_know)-1.96*np.std(f1_know)/np.sqrt(num_test)),100*( np.mean(f1_know)+1.96*np.std(f1_know)/np.sqrt(num_test))))
-
-
-	print("Confidence interval for unknow user")
-	print("EER: ( {} , {} )".format(100*( np.mean(eer_unknow)-1.96*np.std(eer_unknow)/np.sqrt(num_test)),100*( np.mean(eer_unknow)+1.96*np.std(eer_unknow)/np.sqrt(num_test))))
-	print("AUC: ( {} , {} )".format(100*( np.mean(auc_unknow)-1.96*np.std(auc_unknow)/np.sqrt(num_test)), 100*(np.mean(auc_unknow)+1.96*np.std(auc_unknow)/np.sqrt(num_test))))
-	print("F1: ( {} , {} )".format(100*( np.mean(f1_unknow)-1.96*np.std(f1_unknow)/np.sqrt(num_test)),100*( np.mean(f1_unknow)+1.96*np.std(f1_unknow)/np.sqrt(num_test))))
-
-	eer_dif = np.array(eer_unknow)-np.array(eer_know)
-	auc_dif = np.array(auc_know)-np.array(auc_unknow)
-	f1_dif = np.array(f1_know)-np.array(f1_unknow)
+	print(" far: ( {} , {} )".format(
+		100*(np.mean(far_known)-1.96*np.std(far_known)/np.sqrt(num_test)),100*( np.mean(far_known)+1.96*np.std(far_known)/np.sqrt(num_test))))	
+	# print("( {} , {} ) - ( {} , {} ) - ( {} , {} )".format(
+		# 100*(np.mean(fpr_known_)-1.96*np.std(fpr_known_)/np.sqrt(num_test)),100*( np.mean(fpr_known_)+1.96*np.std(fpr_known_)/np.sqrt(num_test)),
+		# 100*(np.mean(fpr_total_)-1.96*np.std(fpr_total_)/np.sqrt(num_test)),100*( np.mean(fpr_total_)+1.96*np.std(fpr_total_)/np.sqrt(num_test)),
+		# 100*(np.mean(fpr_unknown_)-1.96*np.std(fpr_unknown_)/np.sqrt(num_test)),100*( np.mean(fpr_unknown_)+1.96*np.std(fpr_unknown_)/np.sqrt(num_test))))
 	
-	print("Confidence interval for difference")
-	print("EER: ( {} , {} )".format(100*( np.mean(eer_dif)-1.96*np.std(eer_dif)/np.sqrt(num_test)),100*( np.mean(eer_dif)+1.96*np.std(eer_dif)/np.sqrt(num_test))))
-	print("AUC: ( {} , {} )".format(100*( np.mean(auc_dif)-1.96*np.std(auc_dif)/np.sqrt(num_test)),100*( np.mean(auc_dif)+1.96*np.std(auc_dif)/np.sqrt(num_test))))
-	print("F1: ( {} , {} )".format(100*( np.mean(f1_dif)-1.96*np.std(f1_dif)/np.sqrt(num_test)),100*( np.mean(f1_dif)+1.96*np.std(f1_dif)/np.sqrt(num_test))))
+	# print("Confidence interval for know user")
+	# print("EER: ( {} , {} )".format(100*(np.mean(eer_know)-1.96*np.std(eer_know)/np.sqrt(num_test)),100*( np.mean(eer_know)+1.96*np.std(eer_know)/np.sqrt(num_test))))
+	# print("AUC: ( {} , {} )".format(100*( np.mean(auc_know)-1.96*np.std(auc_know)/np.sqrt(num_test)),100*( np.mean(auc_know)+1.96*np.std(auc_know)/np.sqrt(num_test))))
+	# print("F1: ( {} , {} )".format(100*( np.mean(f1_know)-1.96*np.std(f1_know)/np.sqrt(num_test)),100*( np.mean(f1_know)+1.96*np.std(f1_know)/np.sqrt(num_test))))
+
+
+	# print("Confidence interval for unknow user")
+	# print("EER: ( {} , {} )".format(100*( np.mean(eer_unknow)-1.96*np.std(eer_unknow)/np.sqrt(num_test)),100*( np.mean(eer_unknow)+1.96*np.std(eer_unknow)/np.sqrt(num_test))))
+	# print("AUC: ( {} , {} )".format(100*( np.mean(auc_unknow)-1.96*np.std(auc_unknow)/np.sqrt(num_test)), 100*(np.mean(auc_unknow)+1.96*np.std(auc_unknow)/np.sqrt(num_test))))
+	# print("F1: ( {} , {} )".format(100*( np.mean(f1_unknow)-1.96*np.std(f1_unknow)/np.sqrt(num_test)),100*( np.mean(f1_unknow)+1.96*np.std(f1_unknow)/np.sqrt(num_test))))
+
+	# eer_dif = np.array(eer_unknow)-np.array(eer_know)
+	# auc_dif = np.array(auc_know)-np.array(auc_unknow)
+	# f1_dif = np.array(f1_know)-np.array(f1_unknow)
+	
+	# print("Confidence interval for difference")
+	# print("EER: ( {} , {} )".format(100*( np.mean(eer_dif)-1.96*np.std(eer_dif)/np.sqrt(num_test)),100*( np.mean(eer_dif)+1.96*np.std(eer_dif)/np.sqrt(num_test))))
+	# print("AUC: ( {} , {} )".format(100*( np.mean(auc_dif)-1.96*np.std(auc_dif)/np.sqrt(num_test)),100*( np.mean(auc_dif)+1.96*np.std(auc_dif)/np.sqrt(num_test))))
+	# print("F1: ( {} , {} )".format(100*( np.mean(f1_dif)-1.96*np.std(f1_dif)/np.sqrt(num_test)),100*( np.mean(f1_dif)+1.96*np.std(f1_dif)/np.sqrt(num_test))))
